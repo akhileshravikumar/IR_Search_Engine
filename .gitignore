@@ -1,0 +1,7 @@
+__pycache__/
+*.log
+bm25_results.trec
+lm_results.trec
+vsm_results.trec
+documentation
+jtreceval/
