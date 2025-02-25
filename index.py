@@ -18,7 +18,7 @@ nltk.download('punkt_tab')
 ps = PorterStemmer()
 stop_words = set(stopwords.words('english'))
 
-# Step 1: Parse XML and Preprocess Data
+#Parse XML and Preprocess Data
 def parse_cranfield(xml_path):
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -37,13 +37,13 @@ def parse_cranfield(xml_path):
     
     return documents
 
-# Step 2: Preprocessing Function
+#Preprocessing Function
 def preprocess_text(text):
     tokens = word_tokenize(text)
     tokens = [ps.stem(word) for word in tokens if word.isalnum() and word not in stop_words]
     return tokens
 
-# Step 3: Build Inverted Index
+#Build Inverted Index
 def build_inverted_index(documents):
     inverted_index = defaultdict(lambda: defaultdict(int))
     for doc_id, tokens in documents.items():
@@ -51,7 +51,7 @@ def build_inverted_index(documents):
             inverted_index[term][doc_id] += 1
     return inverted_index
 
-# Step 4: Compute TF-IDF for VSM
+#Compute TF-IDF for VSM
 def compute_tfidf(inverted_index, doc_count):
     tfidf = {}
     for term, doc_dict in inverted_index.items():
@@ -59,7 +59,7 @@ def compute_tfidf(inverted_index, doc_count):
         tfidf[term] = {doc_id: tf * idf for doc_id, tf in doc_dict.items()}
     return tfidf
 
-# Step 5: Implement BM25 Scoring
+#Implement BM25 Scoring
 def bm25_score(query_terms, inverted_index, doc_lengths, avg_doc_len, k1=1.5, b=0.75):
     scores = defaultdict(float)
     for term in query_terms:
@@ -71,19 +71,18 @@ def bm25_score(query_terms, inverted_index, doc_lengths, avg_doc_len, k1=1.5, b=
                 scores[doc_id] += score
     return scores
 
+#Implement Language Model(Drichlet Smoothing)
 def lm_score(query_terms, inverted_index, doc_lengths, mu=2000):
     scores = defaultdict(float)
     total_terms_in_collection = sum(doc_lengths.values())
-    
-    # Precompute collection frequency for each query term
+ 
     collection_freq = {}
     for term in query_terms:
         if term in inverted_index:
             collection_freq[term] = sum(inverted_index[term].values())
         else:
             collection_freq[term] = 0
-    
-    # Calculate scores for each document
+
     for doc_id in doc_lengths:
         doc_len = doc_lengths[doc_id]
         score = 0.0
@@ -91,8 +90,7 @@ def lm_score(query_terms, inverted_index, doc_lengths, mu=2000):
             cf = collection_freq.get(term, 0)
             if cf == 0:
                 continue  # Skip terms not in the collection
-            
-            # Term frequency in the current document
+        
             tf = inverted_index[term].get(doc_id, 0) if term in inverted_index else 0
             
             # Calculate probability with Dirichlet smoothing
@@ -104,7 +102,7 @@ def lm_score(query_terms, inverted_index, doc_lengths, mu=2000):
     
     return scores
 
-# Step 6: Implement Vector Space Model (VSM) Scoring
+#Implement Vector Space Model (VSM) Scoring
 def vsm_score(query_terms, tfidf, doc_lengths):
     scores = defaultdict(float)
     query_vector = Counter(query_terms)
@@ -118,17 +116,16 @@ def vsm_score(query_terms, tfidf, doc_lengths):
         scores[doc_id] = cosine_sim
     return scores
 
-# Step 7: Process Queries
+#Query processing
 def process_queries(query_file):
     tree = ET.parse(query_file)
     root = tree.getroot()
     queries = {}
     
-    for top in root.findall("top"):  # Find all <top> elements
-        q_id_elem = top.find("num")   # Find <num> inside <top>
-        q_text_elem = top.find("title")  # Find <title> inside <top>
+    for top in root.findall("top"): 
+        q_id_elem = top.find("num")   
+        q_text_elem = top.find("title") 
         
-        # Check if both <num> and <title> exist and have non-None text
         if q_id_elem is not None and q_text_elem is not None:
             q_id = int(q_id_elem.text.strip())
             q_text = q_text_elem.text if q_text_elem.text is not None else ""
@@ -139,7 +136,7 @@ def process_queries(query_file):
     
     return queries
 
-# Step 8: Rank Documents and Output in TREC Format
+#Rank Documents and Output in TREC Format
 def rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, model):
     results = []
     for q_id, q_terms in queries.items():
@@ -155,7 +152,7 @@ def rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, mod
             results.append(f"{q_id} Q0 {doc_id} {rank} {score:.4f} {model}")
     return results
 
-# Step 9: Save Results and Evaluate
+#Save Results and Evaluate
 def save_results(results, output_file):
     with open(output_file, "w") as f:
         f.write("\n".join(results))
@@ -163,10 +160,9 @@ def save_results(results, output_file):
 def evaluate_results(qrel_file, results_file):
     # Path to the jtreceval .jar file
     jtreceval_jar = "jtreceval/target/jtreceval-0.0.5-jar-with-dependencies.jar"
-    # Run jtreceval using Java
     os.system(f"java -jar {jtreceval_jar} {qrel_file} {results_file}")
 
-# Running the Pipeline
+# Running the Main Pipeline
 documents = parse_cranfield("cranfield-trec-dataset/cran.all.1400.xml")
 inverted_index = build_inverted_index(documents)
 doc_lengths = {doc_id: len(tokens) for doc_id, tokens in documents.items()}
@@ -174,12 +170,12 @@ avg_doc_len = sum(doc_lengths.values()) / len(doc_lengths)
 tfidf = compute_tfidf(inverted_index, len(doc_lengths))
 queries = process_queries("cranfield-trec-dataset/cran.qry.xml")
 
-# Rank documents using BM25, VSM, and LM (placeholder)
+#Rank documents using BM25, VSM, and LM
 bm25_results = rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, "BM25")
 vsm_results = rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, "VSM")
 lm_results = rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, "LM")
 
-# Save results to files
+# Save results
 save_results(bm25_results, "bm25_results.trec")
 save_results(vsm_results, "vsm_results.trec")
 save_results(lm_results, "lm_results.trec")
