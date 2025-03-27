@@ -11,17 +11,16 @@ import math
 import re
 import subprocess
 
-# Ensure required NLTK data is downloaded
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-# Global Variables
+#Global Variables
 ps = PorterStemmer()
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
 
-# Parse XML and Preprocess Data
+#Parse XML and Preprocess Data
 def parse_cranfield(xml_path):
     tree = ET.parse(xml_path)
     root = tree.getroot()
@@ -41,13 +40,13 @@ def parse_cranfield(xml_path):
     print(f"Processed {len(documents)} documents.")
     return documents
 
-# Preprocessing Function
+#Preprocessing Function
 def preprocess_text(text):
     tokens = word_tokenize(text)
     tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalnum() and word not in stop_words]
     return tokens
 
-# Build Inverted Index
+#Build Inverted Index
 def build_inverted_index(documents):
     inverted_index = defaultdict(lambda: defaultdict(int))
     for doc_id, tokens in documents.items():
@@ -55,7 +54,7 @@ def build_inverted_index(documents):
             inverted_index[term][doc_id] = tokens.count(term)
     return inverted_index
 
-# Compute TF-IDF for VSM
+#Compute TF-IDF for VSM
 def compute_tfidf(inverted_index, doc_count):
     tfidf = {}
     for term, doc_dict in inverted_index.items():
@@ -63,7 +62,7 @@ def compute_tfidf(inverted_index, doc_count):
         tfidf[term] = {doc_id: ((1 + math.log(tf)) * idf) / (1 + len(doc_dict)) for doc_id, tf in doc_dict.items()}
     return tfidf
 
-# Implement BM25 Scoring
+#Implement BM25 Scoring
 def bm25_score(query_terms, inverted_index, doc_lengths, avg_doc_len, k1=1.5, b=0.85, top_n=100):
     scores = defaultdict(float)
     for term in query_terms:
@@ -74,7 +73,7 @@ def bm25_score(query_terms, inverted_index, doc_lengths, avg_doc_len, k1=1.5, b=
                 scores[doc_id] += score
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
-# Implement Language Model (Dirichlet Smoothing)
+#Implement Language Model (Dirichlet Smoothing)
 def lm_score(query_terms, inverted_index, doc_lengths, mu=2000, top_n=100):
     scores = defaultdict(float)
     total_terms_in_collection = sum(doc_lengths.values())
@@ -92,11 +91,11 @@ def lm_score(query_terms, inverted_index, doc_lengths, mu=2000, top_n=100):
         for term in query_terms:
             cf = collection_freq.get(term, 0)
             if cf == 0:
-                continue  # Skip terms not in the collection
+                continue  #Skip terms not in the collection
         
             tf = inverted_index[term].get(doc_id, 0) if term in inverted_index else 0
             
-            # Calculate probability with Dirichlet smoothing
+            #Calculate probability 
             p_w_C = cf / total_terms_in_collection
             prob = (tf + mu * p_w_C) / (doc_len + mu)
             score += math.log(prob) if prob > 0 else 0
@@ -105,7 +104,7 @@ def lm_score(query_terms, inverted_index, doc_lengths, mu=2000, top_n=100):
     
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
-# Implement Vector Space Model (VSM) Scoring
+#VSM Scoring
 def vsm_score(query_terms, tfidf, doc_lengths, top_n=100):
     scores = defaultdict(float)
     for term in query_terms:
@@ -114,7 +113,7 @@ def vsm_score(query_terms, tfidf, doc_lengths, top_n=100):
                 scores[doc_id] += weight / (doc_lengths[doc_id] ** 0.5)
     return sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
-# Query processing
+#Query processing
 def process_queries(query_file):
     tree = ET.parse(query_file)
     root = tree.getroot()
@@ -132,7 +131,7 @@ def process_queries(query_file):
     print(f"Processed {len(queries)} queries.")
     return queries
 
-# Rank Documents and Output in TREC Format
+#Rank Documents and Output in TREC Format
 def rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, model):
     results = []
     for q_id, q_terms in queries.items():
@@ -148,7 +147,7 @@ def rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, mod
         
     return results
 
-# Save Results and Evaluate
+#Save Results and Evaluate
 def save_results(results, output_file):
     with open(output_file, "w") as f:
         f.write("\n".join(results))
@@ -167,7 +166,7 @@ def evaluate_results(qrel_file, results_file):
 
     return metrics
 
-# Running the Main Pipeline
+#Main Pipeline
 documents = parse_cranfield("cranfield-trec-dataset/cran.all.1400.xml")
 inverted_index = build_inverted_index(documents)
 doc_lengths = {doc_id: len(tokens) for doc_id, tokens in documents.items()}
@@ -175,17 +174,17 @@ avg_doc_len = sum(doc_lengths.values()) / len(doc_lengths)
 tfidf = compute_tfidf(inverted_index, len(doc_lengths))
 queries = process_queries("cranfield-trec-dataset/cran.qry.xml")
 
-# Rank documents using BM25, VSM, and LM
+#Rank documents using BM25, VSM, and LM
 bm25_results = rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, "BM25")
 vsm_results = rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, "VSM")
 lm_results = rank_documents(queries, inverted_index, doc_lengths, avg_doc_len, tfidf, "LM")
 
-# Save results
+#Save results
 save_results(bm25_results, "bm25_results.trec")
 save_results(vsm_results, "vsm_results.trec")
 save_results(lm_results, "lm_results.trec")
 
-# Evaluate results using trec_eval
+#Evaluate results using trec_eval
 print("\nModel\tMAP\tP@5\tNDCG")
 print("-"*30)
 for model, results_file in [("BM25", "bm25_results.trec"), ("VSM", "vsm_results.trec"), ("LM", "lm_results.trec")]:
